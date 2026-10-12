@@ -1,8 +1,8 @@
--- JMTECH Fallen | UI-brand adaptation of April v4.3.6
--- Original April source and authorship: Cunzaki (credit retained).
--- Changes limited to presentation labels; internal names, APIs, game logic,
--- external assets and configuration keys are intentionally unchanged.
--- NOT independently runtime-tested; no anti-detection/anti-ban guarantee.
+-- JMTECH Fallen Vector | UI and Diagnostics Build 1.1
+-- Derived from April v4.3.6 by Cunzaki; original attribution retained.
+-- Changes: presentation branding and rate-limited error reporting.
+-- Gameplay and anti-cheat related mechanisms are not upgraded.
+-- Syntax checked with Lua compiler; Project Vector runtime NOT verified.
 
 April = {
     version = "4.3.6",
@@ -716,24 +716,37 @@ function M.verbose()
 end
 function M.log(_msg) end
 function M.warn(_msg) end
-function M.warn_once(_key, _msg) end
-function M.error_once(_key, _err)
+function M.warn_once(key, message)
+    local k = "warn:" .. tostring(key)
+    if seen_errors[k] then return end
+    seen_errors[k] = 1
+    print("[JMTECH] Warning (" .. tostring(key) .. "): " .. tostring(message))
+end
+function M.error_once(key, err)
+    local k = "error:" .. tostring(key)
+    local count = seen_errors[k] or 0
+    seen_errors[k] = count + 1
+    if count == 0 then
+        print("[JMTECH] Error (" .. tostring(key) .. "): " .. tostring(err))
+    end
 end
 function M.guard(key, fn, ...)
     return M.guard_fast(key, fn, ...)
 end
-function M.guard_fast(_key, fn, ...)
+function M.guard_fast(key, fn, ...)
     if type(fn) ~= "function" then return nil end
     local ok, a, b, c = pcall(fn, ...)
     if not ok then
+        M.error_once(key, a)
         return nil
     end
     return a, b, c
 end
-function M.guard_bool(_key, fn, ...)
+function M.guard_bool(key, fn, ...)
     if type(fn) ~= "function" then return false end
     local ok, result = pcall(fn, ...)
     if not ok then
+        M.error_once(key, result)
         return false
     end
     return true, result
@@ -32403,7 +32416,7 @@ local TIPS = {
     april_base_chams_color = "Tsvet preseta svecheniya (tolko Fill Glow / Wireframe Glow).",
     april_base_xray_enabled = "Karkasnye mesh chams na stenah/polah/fundamentah (Detail meshes). Tolko ApplyChams — bez zapisey Material/Texture/Transparency i bez novyh instansov. Propuskaet tseli Base ESP (dveri, yaschiki, tureli, shkafy).",
     april_base_xray_range = "Tolko strukturnye kuski v etoy distantsii poluchayut karkasnye chamsy.",
-    april_ui_startup_intro = "Proigryvaet intro April.lua pri kazhdom zapuske skripta. Sohranite v profile avtozagruzki.",
+    april_ui_startup_intro = "Proigryvaet intro JMTECH Fallen pri kazhdom zapuske skripta. Sohranite v profile avtozagruzki.",
     april_ui_menu_key = "Klavisha otkrytiya i zakrytiya etogo menyu.",
     april_ui_menu_overlay = "Zatemnyaet ves ekran za menyu s plavnym feydom. Ne perekryvaet elementy upravleniya menyu.",
     april_ui_snow = "Myagkiy padayuschiy sneg za menyu. Skryt pri Reduce Motion.",
@@ -32831,7 +32844,7 @@ april_base_chams_mode = "Fill, Wireframe, Fill Glow, or Wireframe Glow.",
 april_base_chams_color = "Glow preset color (Fill Glow / Wireframe Glow only).",
 april_base_xray_enabled = "Wireframe mesh chams on structural walls/floors/foundations (Detail meshes). ApplyChams only — no Material/Texture/Transparency writes, no new instances. Skips Base ESP targets (doors, boxes, turrets, cabinets).",
 april_base_xray_range = "Only structural pieces within this distance get wireframe chams.",
-april_ui_startup_intro = "Plays the April.lua intro whenever the script executes. Save it in your autoload profile.",
+april_ui_startup_intro = "Plays the JMTECH Fallen intro whenever the script executes. Save it in your autoload profile.",
 april_ui_menu_key = "Key used to open and close this menu.",
 april_ui_menu_overlay = "Darkens the whole screen behind the menu with a smooth fade. Does not cover menu controls.",
 april_ui_snow = "Soft falling snow behind the menu. Hidden when Reduce Motion is on.",
@@ -36752,9 +36765,9 @@ function M.draw()
     local author_x = center_x + (1 - author_t) * math.min(125, width * 0.12)
     local title_size = math.max(40, math.floor(54 * (theme.SCALE or 1)))
     local author_size = math.max(15, math.floor(18 * (theme.SCALE or 1)))
-    draw_wave("April.lua", title_x, center_y - 38, title_size, title_alpha, 0, 1.35)
+    draw_wave("JMTECH Fallen", title_x, center_y - 38, title_size, title_alpha, 0, 1.35)
     local i18n = April.require("ui.i18n")
-    draw_wave(i18n.t("Made by Cunzaki"), author_x, center_y + 22, author_size, author_alpha, 1.7, 0.8)
+    draw_wave("April base by Cunzaki", author_x, center_y + 22, author_size, author_alpha, 1.7, 0.8)
     draw_module_status(center_x, center_y + 62, elapsed, author_alpha)
     if profile_alpha > 0.01 then
         local final_w = math.max(230, math.min(420, math.floor(math.min(width, height) * 0.50)))
@@ -36857,7 +36870,7 @@ end
 return cursor_x
 end
 local function draw_brand(x, y)
-draw_wave_text("April.lua", x, y, theme.FONT_BRAND or 15)
+draw_wave_text("JMTECH Fallen", x, y, theme.FONT_BRAND or 15)
 end
 local function clamp_window()
 local sw, sh = screen_size()
@@ -37488,7 +37501,7 @@ local version_text = "v" .. tostring(April.version or "")
 widgets.text(x + w - 14 - text_width(version_text, theme.FONT_CAPTION), y + 5,
 version_text, theme.TEXT_DIM, theme.FONT_CAPTION)
 local i18n = April.require("ui.i18n")
-local author_text = i18n.t("Made by Cunzaki")
+local author_text = "April base by Cunzaki"
 local author_size = math.max(8, (theme.FONT_CAPTION or 11) - 2)
 draw_wave_text(
 author_text,
@@ -37848,5 +37861,5 @@ local ok, err = pcall(function()
 end)
 
 if not ok then
-    print("[April] Fatal: " .. tostring(err))
+    print("[JMTECH] Fatal: " .. tostring(err))
 end
