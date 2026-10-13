@@ -1,3 +1,19 @@
+-- JMTECH Fallen Vector | Aim Menu Clarity 2.3
+-- UI reference choices only; no new gameplay targeting/hit manipulation.
+-- Original April v4.3.6 by Cunzaki; original attribution retained.
+-- Keep original config keys and runtime code untouched.
+-- JMTECH Fallen Vector | Menu Organization v2.1
+-- Reorganized display names and sections in ui.catalog_aim only.
+-- All existing config IDs, callbacks, and gameplay behavior are unchanged.
+-- Based on April by Cunzaki; attribution retained.
+
+-- v2.0: added sampled UI draw-timing diagnostics; gameplay logic unchanged.
+-- JMTECH Fallen Vector | UI Stability & Diagnostics v2.0
+-- Based on April v4.3.6 by Cunzaki; original credit retained.
+-- Changes: reject non-finite cursor API coordinates; preserve existing UI and settings.
+-- Does not alter any gameplay targeting, recoil or silent-hit logic.
+-- Not validated in the actual Project Vector runtime.
+
 -- JMTECH Fallen Vector | Internal module branding update 1.8
 -- Based on April v4.3.6 by Cunzaki. Original authorship retained.
 -- Renamed code identifier April -> JMTECH; preserved april_* settings keys and original assets.
@@ -31004,6 +31020,14 @@ function M.begin_frame()
 frame_keys = {}
 frame_pressed = {}
 ensure_scroll_hooks()
+-- Keep cursor samples finite; NaN/Infinity can corrupt menu hit tests.
+local function jmtech_finite_coordinate(value)
+    local n = tonumber(value)
+    if n and n == n and n ~= math.huge and n ~= -math.huge then
+        return n
+    end
+    return nil
+end
 local amx, amy = 0, 0
 local ok_mouse, px, py = pcall(function()
     if utility and type(utility.get_mouse_pos) == "function" then
@@ -31014,8 +31038,8 @@ local ok_mouse, px, py = pcall(function()
         return input.get_mouse_position()
     end
 end)
-if ok_mouse and tonumber(px) and tonumber(py) then
-    amx, amy = tonumber(px), tonumber(py)
+if ok_mouse and jmtech_finite_coordinate(px) and jmtech_finite_coordinate(py) then
+    amx, amy = jmtech_finite_coordinate(px), jmtech_finite_coordinate(py)
 else
     amx, amy = M.raw_mx or 0, M.raw_my or 0
 end
@@ -31080,8 +31104,8 @@ local ok_pos, px, py = pcall(function()
         return input.get_mouse_position()
     end
 end)
-if ok_pos and tonumber(px) and tonumber(py) then
-    x, y = tonumber(px), tonumber(py)
+if ok_pos and jmtech_finite_coordinate(px) and jmtech_finite_coordinate(py) then
+    x, y = jmtech_finite_coordinate(px), jmtech_finite_coordinate(py)
 end
 local col = cursor_theme.ACCENT or { 0.75, 0.15, 0.83, 1 }
 local press = cursor_anim.transition("cursor:press", M.lmb, cursor_anim.motion_rate(26))
@@ -35211,9 +35235,15 @@ items = {
 kb("april_aimbot", "Enable Aimbot", false, nil, { hide_color = true }),
 ak("april_aim_key", "Aim Key"),
 sep(),
-I.label("Targeting", true),
-combo("april_aim_target_type", "Target Type", { "Crosshair", "Distance" }, 0),
-combo("april_aim_bone", "Hitbox", combat_menu.SILENT_BONES, 0),
+I.label("Method Selection (UI preview only)", true),
+combo("jmtech_aim_method_preview", "Selected Method (Display Only)", { "Camera", "Mouse", "Silent Aim", "Raycast Silent" }, 0),
+I.label("Single dropdown selection; not connected to gameplay", false),
+I.label("Aimbot, Silent Aim and Bullet switches remain independent", false),
+I.label("For GUI testing, keep other aim switches disabled", false),
+sep(),
+I.label("Target Selection", true),
+combo("april_aim_target_type", "Selection Method", { "Crosshair", "Distance" }, 0),
+combo("april_aim_bone", "Selected Body Part", combat_menu.SILENT_BONES, 0),
 multi("april_aim_targets", "Aim At", combat_menu.AIM_AT_OPTIONS, combat_menu.AIM_AT_DEFAULTS),
 multi("april_aim_filters", "Filters", {
 "Health Check", "Visible Only", "Team Check",
@@ -35223,7 +35253,8 @@ input("april_aim_whitelist_ids", "Whitelist IDs", ""),
 btn("april_aim_whitelist_clear", "Clear Whitelist"),
 sl("april_aim_max_dist", "Max Distance (m)", 50, 2000, 500),
 sep(),
-I.label("Behavior", true),
+I.label("Camera / Mouse Settings", true),
+I.label("Camera / Mouse options use the existing implementation", false),
 cb("april_aim_sticky", "Sticky Aim", false),
 cb("april_aim_auto_pred", "Auto Prediction", true),
 sl("april_aim_smooth", "Smoothness", 1, 25, 10),
@@ -35234,7 +35265,7 @@ cb("april_aim_humanize", "Humanize", false),
 sl("april_aim_humanize_str", "Humanize Strength", 1, 100, 35, false, "april_aim_humanize"),
 sl("april_aim_fov", "FOV Radius (px)", 5, 600, 120),
 sep(),
-I.label("Feedback", true),
+I.label("Visual Feedback", true),
 cb("april_aim_draw_fov", "FOV Circle", false, { 0.2, 1, 0.45, 1 }),
 combo("april_aim_fov_style", "FOV Style", { "Outline", "Filled Circle" }, 1, "april_aim_draw_fov"),
 cb("april_aim_target_line", "Target Line", false, { 0.2, 1, 0.45, 1 }),
@@ -35255,9 +35286,9 @@ master = "april_silent_aim",
 items = {
 kb("april_silent_aim", "Enable Silent Aim", false, nil, { hide_color = true }),
 sep(),
-I.label("Targeting", true),
-combo("april_silent_target_type", "Target Type", { "Crosshair", "Distance" }, 0),
-combo("april_silent_bone", "Hitbox", combat_menu.SILENT_BONES, 0),
+I.label("Target Selection", true),
+combo("april_silent_target_type", "Selection Method", { "Crosshair", "Distance" }, 0),
+combo("april_silent_bone", "Selected Body Part", combat_menu.SILENT_BONES, 0),
 multi("april_silent_targets", "Aim At", combat_menu.AIM_AT_OPTIONS, combat_menu.AIM_AT_DEFAULTS),
 multi("april_silent_filters", "Filters", {
 "Health Check", "Visible Only", "Team Check",
@@ -35267,12 +35298,13 @@ input("april_silent_whitelist_ids", "Whitelist IDs", ""),
 btn("april_silent_whitelist_clear", "Clear Whitelist"),
 sl("april_silent_max_dist", "Max Distance (m)", 50, 2000, 500),
 sep(),
-I.label("Accuracy", true),
+I.label("Silent Aim Settings", true),
+I.label("Method preview does not activate Raycast Silent", false),
 cb("april_silent_sticky", "Sticky Aim", false),
 sl("april_silent_hit_chance", "Hit Chance %", 1, 100, 100),
 sl("april_silent_fov", "FOV Radius (px)", 5, 600, 150),
 sep(),
-I.label("Feedback", true),
+I.label("Visual Feedback", true),
 cb("april_silent_draw_fov", "FOV Circle", false, { 0.55, 0.2, 1, 1 }),
 combo("april_silent_fov_style", "FOV Style", { "Outline", "Filled Circle" }, 1, "april_silent_draw_fov"),
 cb("april_silent_target_line", "Snapline", false, { 1, 0.25, 0.25, 1 }),
@@ -37803,6 +37835,33 @@ local manip_math = JMTECH.require("core.manip_math")
 local M = {}
 local initialized = false
 local alias_refresh_elapsed = 0
+-- JMTECH UI-only performance monitor; does not read or change targeting logic.
+local jmtech_ui_last_report = 0
+local jmtech_ui_sample_counter = 0
+local function jmtech_ui_tick_ms()
+    local fn = utility and (utility.GetTickCount or utility.get_tick_count)
+    if type(fn) ~= "function" then return nil end
+    local ok, value = pcall(fn)
+    if ok and type(value) == "number" and value == value then return value end
+    return nil
+end
+local function jmtech_ui_draw_guarded()
+    -- Sample only every 30th frame to avoid adding work to the renderer.
+    jmtech_ui_sample_counter = jmtech_ui_sample_counter + 1
+    local sample = (jmtech_ui_sample_counter % 30 == 0)
+    local before = sample and jmtech_ui_tick_ms() or nil
+    debug.guard_fast("custom_menu.draw", custom_menu.draw)
+    if before then
+        local after = jmtech_ui_tick_ms()
+        if after and after >= before then
+            local elapsed = after - before
+            if elapsed >= 33 and (after - jmtech_ui_last_report) >= 10000 then
+                jmtech_ui_last_report = after
+                print(string.format("[JMTECH UI] menu draw %d ms (sampled); check FPS/overlay load", elapsed))
+            end
+        end
+    end
+end
 function M.init()
     if initialized then return true end
     pcall(function()
@@ -37847,7 +37906,7 @@ function M.on_frame()
     debug.guard_fast("overlay_theme.sync", overlay_theme.sync)
     debug.guard_fast("tabs.draw", tabs.draw)
     debug.guard_fast("notify.draw", notify.draw)
-    debug.guard_fast("custom_menu.draw", custom_menu.draw)
+    jmtech_ui_draw_guarded()
 end
 return M
 end)()
