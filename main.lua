@@ -1,3 +1,11 @@
+-- JMTECH Fallen v3.0 | Diagnostics Scope Repair
+-- Fix: forward-declare frame timer helper used by performance sampler.
+-- UI, camera and gameplay routines otherwise preserved.
+-- Source attribution to Cunzaki retained.
+-- JMTECH Fallen Vector | v2.6 Stability and Runtime Diagnostics
+-- Based on v2.5 by JMTECH; original Cunzaki attribution preserved below.
+-- Safe changes: UI diagnostics, startup reporting, method-label transparency.
+-- No changes to multiplayer targeting, weapon ballistics, raycast-hit overrides.
 -- JMTECH Fallen v2.5: API-aligned UI profile and honest runtime status
 -- UI-only profile selection; existing gameplay/targeting code is unchanged.
 -- Targeting, projectile, and silent-hit implementations remain unchanged.
@@ -35244,7 +35252,8 @@ I.label("Camera view: shows existing shared controls", false, nil),
 I.label("Mouse view: shows existing shared controls", false, nil),
 I.label("Silent view: settings remain in separate Silent Aim group", false, nil),
 I.label("Raycast view: no gameplay method installed by this selector", false, nil),
-I.label("Selection changes layout only; does not enable gameplay functions", false),
+I.label("Method selection changes UI layout, not gameplay logic", false),
+I.label("Aimbot, Silent and Bullet are separate existing controls", false),
 sep(),
 I.label("Target Selection", true),
 combo("april_aim_target_type", "Selection Method", { "Crosshair", "Distance" }, 0),
@@ -37843,7 +37852,33 @@ local alias_refresh_elapsed = 0
 -- JMTECH UI-only performance monitor; does not read or change targeting logic.
 local jmtech_ui_last_report = 0
 local jmtech_ui_sample_counter = 0
-local function jmtech_ui_tick_ms()
+local jmtech_perf_last_report = 0
+local jmtech_perf_late_frames = 0
+local jmtech_perf_max_dt = 0
+local jmtech_perf_samples = 0
+-- Forward declare the monotonic clock helper: runtime sampler uses it.
+local jmtech_ui_tick_ms
+local function jmtech_runtime_sample()
+    -- Diagnostics only: does not inspect or control aiming, raycast or weapon state.
+    local fn = utility and (utility.GetDeltaTime or utility.get_delta_time)
+    if type(fn) ~= "function" then return end
+    local ok, dt = pcall(fn)
+    if not ok or type(dt) ~= "number" or dt ~= dt or dt < 0 then return end
+    jmtech_perf_samples = jmtech_perf_samples + 1
+    if dt > jmtech_perf_max_dt then jmtech_perf_max_dt = dt end
+    if dt >= 0.05 then jmtech_perf_late_frames = jmtech_perf_late_frames + 1 end
+    if jmtech_perf_samples >= 300 then
+        local now = jmtech_ui_tick_ms()
+        if now and (jmtech_perf_last_report == 0 or now - jmtech_perf_last_report >= 10000) then
+            jmtech_perf_last_report = now
+            print(string.format("[JMTECH PERF] 300 frames, slow(>=50ms)=%d, max_dt=%.1fms; timing may be clamped by API", jmtech_perf_late_frames, jmtech_perf_max_dt * 1000))
+        end
+        jmtech_perf_samples = 0
+        jmtech_perf_late_frames = 0
+        jmtech_perf_max_dt = 0
+    end
+end
+jmtech_ui_tick_ms = function()
     local fn = utility and (utility.GetTickCount or utility.get_tick_count)
     if type(fn) ~= "function" then return nil end
     local ok, value = pcall(fn)
@@ -37874,8 +37909,13 @@ function M.init()
     end)
     initialized = tabs.init()
     if initialized then
-        pcall(custom_menu.init)
-        pcall(startup_intro.init)
+        local menu_ok, menu_err = pcall(custom_menu.init)
+        if not menu_ok then print("[JMTECH INIT] menu initialization error: " .. tostring(menu_err)) end
+        local intro_ok, intro_err = pcall(startup_intro.init)
+        if not intro_ok then print("[JMTECH INIT] intro initialization error: " .. tostring(intro_err)) end
+        print("[JMTECH INIT] v3.0 diagnostics ready; timer scope fixed; gameplay methods unchanged")
+    else
+        print("[JMTECH INIT] tabs.init failed; check Project Vector Console")
     end
     return initialized
 end
@@ -37912,6 +37952,10 @@ function M.on_frame()
     debug.guard_fast("tabs.draw", tabs.draw)
     debug.guard_fast("notify.draw", notify.draw)
     jmtech_ui_draw_guarded()
+    -- One inexpensive sample every 30 frames, in addition to menu render profiling.
+    if jmtech_ui_sample_counter % 30 == 0 then
+        jmtech_runtime_sample()
+    end
 end
 return M
 end)()
